@@ -52,7 +52,7 @@ const char hex[] =
   '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
 };
 
-const char version_string[] = {"EEPROM Version=0.04a for 27c512"};
+const char version_string[] = {"EEPROM Version=0.04d for 27c512"};
 
 static const int kPin_Addr15  = 24; //1  1
 static const int kPin_Addr14  = 27; //1  27
@@ -187,7 +187,7 @@ void ReadEEPROM() // R<address>  - read kMaxBufferSize bytes from EEPROM, beginn
   digitalWrite(kPin_nWE, HIGH); // disables write
   SetDataLinesAsInputs();
   digitalWrite(kPin_nOE, LOW); // makes the EEPROM output the byte
-  delayMicroseconds(1);
+  delayMicroseconds(15);
       
   ReadEEPROMIntoBuffer(addr, kMaxBufferSize);
 
@@ -336,6 +336,7 @@ void ReadEEPROMIntoBuffer(int addr, int size)
   for (int x = 0; x < size; ++x)
   {
     buffer[x] = ReadByteFrom(addr + x);
+    delayMicroseconds(2);
   }
 
   digitalWrite(kPin_nOE, HIGH);
