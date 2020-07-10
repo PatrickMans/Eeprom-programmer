@@ -45,6 +45,11 @@
 //
 
 #include <avr/pgmspace.h>
+// include the library code:
+ #include <LiquidCrystal.h>
+ 
+// initialize the library with the numbers of the interface pins
+ LiquidCrystal lcd(8, 9, 10, 11, 12, 13);
 
 const char hex[] =
 {
@@ -52,9 +57,20 @@ const char hex[] =
   '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
 };
 
-const char version_string[] = {"EEPROM Version=0.04d for 27c512"};
+const char version_string[] = {"Version=0.15 PM"};
 
-static const int kPin_Addr15  = 24; //1  1
+//Definition for 27256
+static const int kPin_nOE     = 37; //22 22
+static const int kPin_nCE     = 41; //20 20 
+static const int kPin_nWE     = 24;  //1  22
+
+//definition for 27512
+//static const int kPin_nCE     = 25; //20 20 
+//static const int kPin_nOE     = 37; //22 22
+//static const int kPin_nWE     = 41;  //1  22
+//static const int kPin_Addr15  = 24; //1  1
+
+//Generic definitions
 static const int kPin_Addr14  = 27; //1  27
 static const int kPin_Addr13  = 29; //26 26
 static const int kPin_Addr12  = 26; //2  2
@@ -79,10 +95,7 @@ static const int kPin_Data3   = 51; //15 15
 static const int kPin_Data2   = 48; //13 13
 static const int kPin_Data1   = 46; //12 12
 static const int kPin_Data0   = 44; //11 11
-static const int kPin_nWE     = 37; //1  22
-static const int kPin_nOE     = 37; //22 22
-static const int kPin_nCE     = 41; //20 20 
-static const int kPin_WaitingForInput  = 13;
+static const int kPin_WaitingForInput  = 14;
 static const int kPin_LED_Red = 22;
 static const int kPin_LED_Grn = 53;
 
@@ -90,8 +103,8 @@ byte g_cmd[80]; // strings received from the controller will go in here
 static const int kMaxBufferSize = 16;
 byte buffer[kMaxBufferSize];
 
-static const long int k_uTime_WritePulse_uS = 1; 
-static const long int k_uTime_ReadPulse_uS = 1;
+static const long int k_uTime_WritePulse_uS = 25; 
+static const long int k_uTime_ReadPulse_uS = 25;
              long int k_uTime_WriteDelay_uS = 50; // delay between byte writes - needed for at28c16
 // (to be honest, both of the above are about ten times too big - but the Arduino won't reliably
 // delay down at the nanosecond level, so this is the best we can do.)
@@ -101,7 +114,7 @@ void setup()
 {
   Serial.begin(9600);
 //  Serial.println(version_string);
-  
+  lcd.begin(8, 2);
   pinMode(kPin_WaitingForInput, OUTPUT); digitalWrite(kPin_WaitingForInput, HIGH);
   pinMode(kPin_LED_Red, OUTPUT); digitalWrite(kPin_LED_Red, LOW);
   pinMode(kPin_LED_Grn, OUTPUT); digitalWrite(kPin_LED_Grn, LOW);
@@ -122,10 +135,15 @@ void setup()
   pinMode(kPin_Addr12, OUTPUT);
   pinMode(kPin_Addr13, OUTPUT);
   pinMode(kPin_Addr14, OUTPUT);
-  pinMode(kPin_Addr15, OUTPUT);
+  //pinMode(kPin_Addr15, OUTPUT);
   
-  
-
+ //lcd.print("EEprommer Initialized!");
+// lcd.print("Eepromme");
+// lcd.setCursor(0, 1);
+// lcd.print("r Init! ");
+  LCDPrint("Eeprommer Init!");
+  delay(5000);
+  LCDPrint(version_string);
   // control lines are ALWAYS outputs
   pinMode(kPin_nCE, OUTPUT); digitalWrite(kPin_nCE, LOW); // might as well keep the chip enabled ALL the time
   pinMode(kPin_nOE, OUTPUT); digitalWrite(kPin_nOE, HIGH);
@@ -153,7 +171,7 @@ void loop()
                 SDPadr1=-1; SDPadr2=-1; Serial.println("Set params for 28C16");break;
       case 'B': k_uTime_WriteDelay_uS=5;  
                 SDPadr1=0x1555; SDPadr2=0x0AAA; Serial.println("Set params for 28C64");break;
-      case 'C': k_uTime_WriteDelay_uS=5;  
+      case 'C': k_uTime_WriteDelay_uS=25;  
                 SDPadr1=0x5555; SDPadr2=0x2AAA; Serial.println("Set params for 28C256");break;
       case '+': k_uTime_WriteDelay_uS=k_uTime_WriteDelay_uS+50;  
                 if (k_uTime_WriteDelay_uS > 500) k_uTime_WriteDelay_uS = 500; 
@@ -167,11 +185,23 @@ void loop()
   }
 }
 
+void LCDPrint (String STR)
+{
+//   var String STR;
+   String LINE1 = STR.substring(0, 8);
+   String LINE2 = STR.substring(8);
+   lcd.setCursor(0,0);
+   lcd.print(LINE1);
+   lcd.setCursor(0, 1);
+   lcd.print(LINE2 + "          ");
+}
+
 void ReadEEPROM() // R<address>  - read kMaxBufferSize bytes from EEPROM, beginning at <address> (in hex)
 {
   if (g_cmd[1] == 0)
   {
     Serial.println("ERR");
+    LCDPrint("Error in reading Eeprom");
     return;
   }
 
@@ -187,8 +217,10 @@ void ReadEEPROM() // R<address>  - read kMaxBufferSize bytes from EEPROM, beginn
   digitalWrite(kPin_nWE, HIGH); // disables write
   SetDataLinesAsInputs();
   digitalWrite(kPin_nOE, LOW); // makes the EEPROM output the byte
-  delayMicroseconds(15);
-      
+  delayMicroseconds(2);
+
+  String ADDRS = String(addr, HEX);
+  LCDPrint("reading: "+ ADDRS + "       ");
   ReadEEPROMIntoBuffer(addr, kMaxBufferSize);
 
   // now print the results, starting with the address as hex ...
@@ -200,7 +232,7 @@ void ReadEEPROM() // R<address>  - read kMaxBufferSize bytes from EEPROM, beginn
   PrintBuffer(kMaxBufferSize);
 
   Serial.println("OK");
-
+//  LCDPrint("Reading OK        ")
   digitalWrite(kPin_nOE, HIGH); // stops the EEPROM outputting the byte
 }
 
@@ -209,6 +241,7 @@ void WriteEEPROM() // W<four byte hex address>:<data in hex, two characters per 
   if (g_cmd[1] == 0)
   {
     Serial.println("ERR");
+    LCDPrint("Error in writing Eeprom");
     return;
   }
 
@@ -260,6 +293,8 @@ void WriteEEPROM() // W<four byte hex address>:<data in hex, two characters per 
   // buffer should now contains some data
   if (iBufferUsed > 0)
   {
+    String ADDRS = String(addr, HEX);
+    LCDPrint("Writing: "+ ADDRS + "       ");
     WriteBufferToEEPROM(addr, iBufferUsed);
   }
 
@@ -331,12 +366,14 @@ void ReadEEPROMIntoBuffer(int addr, int size)
   digitalWrite(kPin_LED_Grn, HIGH);
   digitalWrite(kPin_nWE, HIGH);
   SetDataLinesAsInputs();
+  delayMicroseconds(1);
   digitalWrite(kPin_nOE, LOW);
+//  delayMicroseconds(2);
   
   for (int x = 0; x < size; ++x)
   {
     buffer[x] = ReadByteFrom(addr + x);
-    delayMicroseconds(2);
+//    delayMicroseconds(5);
   }
 
   digitalWrite(kPin_nOE, HIGH);
@@ -432,7 +469,7 @@ void SetAddress(int a)
   digitalWrite(kPin_Addr12, (a&4096)?HIGH:LOW );
   digitalWrite(kPin_Addr13, (a&8192)?HIGH:LOW );
   digitalWrite(kPin_Addr14, (a&16384)?HIGH:LOW);
-  digitalWrite(kPin_Addr15, (a&32768)?HIGH:LOW);
+ // digitalWrite(kPin_Addr15, (a&32768)?HIGH:LOW);
 }
 
 // this function assumes that data lines have already been set as OUTPUTS.
